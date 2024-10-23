@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Игра в Лизинг</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #f0f0f0;
+            --tg-theme-text-color: #000000;
+            --tg-theme-button-color: #3498db;
+            --tg-theme-button-text-color: #ffffff;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            margin: 0;
+            padding: 10px;
+            min-height: 100vh;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;        
+        }
+        
+        .header {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px;
+            color: var(--tg-theme-text-color);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .game-info {
+            font-size: 20px;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 10px;
+            background: var(--tg-theme-bg-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, minmax(25px, 30px));
+            gap: 1px;
+            background-color: #ccc;
+            padding: 1px;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: auto;
+        }
+        
+        .cell {
+            aspect-ratio: 1;
+            background-color: #eee;
+            border: 1px solid #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+            font-size: 16px;
+        }
+        
+        .cell:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .cell.revealed {
+            background-color: #fff;
+        }
+        
+        .cell.mine {
+            background-color: #ff4444;
+        }
+        
+        .cell.flagged {
+            background-color: #ffeb3b;
+        }
+
+        .game-message {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 100;
+            white-space: nowrap;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 90vw;
+        }
+
+        .game-message.show {
+            opacity: 1;
+            top: -50px;
+        }
+
+        .grid-container {
+            position: relative;
+            margin: 60px 0 20px 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .controls {
+            margin: 15px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .emoji {
+            margin: 0 5px;
+        }
+
+        @media (max-width: 360px) {
+            .cell {
+                font-size: 14px;
+            }
+            
+            .game-info {
+                font-size: 16px;
+            }
+            
+            .header {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span class="emoji">🚗</span>
+        Игра в Лизинг
+        <span class="emoji">📋</span>
+    </div>
+    <div class="game-container">
+        <div class="game-info">
+            <div>Мины: <span id="mines-count">10</span></div>
+            <div>Время: <span id="timer">0</span></div>
+        </div>
+        <div class="grid-container">
+            <div id="gameMessage" class="game-message"></div>
+            <div id="grid" class="grid"></div>
+        </div>
+        <div class="controls">
+            <button onclick="initGame()">Новая игра</button>
+        </div>
+    </div>
+<script>
+        // Инициализация Telegram Mini App
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Раскрываем на всю высоту
+
+        // Устанавливаем цвета из темы Telegram
+        document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor || '#f0f0f0');
+        document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor || '#000000');
+        document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor || '#3498db');
+        document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor || '#ffffff');
+
+        // Основные переменные игры
+        const GRID_SIZE = 10;
+        const MINES_COUNT = 10;
+        let grid = [];
+        let minesLeft = MINES_COUNT;
+        let gameOver = false;
+        let timer = 0;
+        let timerInterval;
+        let gameStarted = false;
+
+        const trollingMessages = [
+            "Пока ты играешь, твой клиент ушел к конкурентам! 🏃‍♂️",
+            "Директор: «А где отчёт по сделкам?» Ты: *играешь в сапёра* 🎮",
+            "Твоя зарплата так же стремится к нулю, как и прогресс по плану! 📉",
+            "Успешное нажатие! Жаль, что не успешная сделка... 😅",
+            "Андеррайтинг: *отказ*, Ты: *открываешь новую игру* 🤦‍♂️",
+            "Клиент: «Где КП?» Ты: *ставишь новый рекорд в сапёре* 🏆",
+            "Конец месяца близко, а ты всё ещё здесь! ⏰",
+            "План горит, а ты прохлаждаешься! 🔥",
+            "Может хватит уже играть? А, ладно, ещё одну... 🎲",
+            "Коллеги закрывают сделки, а ты закрываешь клеточки! 📦",
+            "Новый клик! Если бы это была новая заявка... 📝",
+            "Твой бонус тает с каждым кликом! 💸",
+            "Skill issue в сапёре или в продажах? 🤔",
+            "Профессионально уклоняешься от работы! 🎯",
+            "Вместо плана закрываешь клеточки? Гениально! 👌"
+        ];
+
+        // Запрещаем зум на мобильных устройствах
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        document.addEventListener('gesturestart', function(e) {
+            e.preventDefault();
+        });
+
+        function showGameMessage(forcedMessage = null) {
+            const messageElement = document.getElementById('gameMessage');
+            const message = forcedMessage || trollingMessages[Math.floor(Math.random() * trollingMessages.length)];
+            
+            messageElement.textContent = message;
+            messageElement.classList.add('show');
+            
+            if (messageElement.hideTimer) {
+                clearTimeout(messageElement.hideTimer);
+            }
+            
+            messageElement.hideTimer = setTimeout(() => {
+                messageElement.classList.remove('show');
+            }, 3500);
+        }
+
+        function startTimer() {
+            timer = 0;
+            gameStarted = true;
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function updateTimer() {
+            timer++;
+            document.getElementById('timer').textContent = timer;
+        }
+
+        function createGrid() {
+            const gridElement = document.getElementById('grid');
+            gridElement.innerHTML = '';
+            grid = [];
+            
+            for (let i = 0; i < GRID_SIZE; i++) {
+                grid[i] = [];
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    grid[i][j] = {
+                        mine: false,
+                        revealed: false,
+                        flagged: false,
+                        neighborMines: 0
+                    };
+                    
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', handleClick);
+                    cell.addEventListener('contextmenu', handleRightClick);
+                    cell.addEventListener('touchstart', handleTouchStart);
+                    cell.addEventListener('touchend', handleTouchEnd);
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+let touchTimer = null;
+        let touchDuration = 500;
+
+        function handleTouchStart(event) {
+            event.preventDefault();
+            touchTimer = setTimeout(() => {
+                const row = parseInt(event.target.dataset.row);
+                const col = parseInt(event.target.dataset.col);
+                handleLongTouch(row, col);
+            }, touchDuration);
+        }
+
+        function handleTouchEnd(event) {
+            event.preventDefault();
+            if (touchTimer) {
+                clearTimeout(touchTimer);
+                const row = parseInt(event.target.dataset.row);
+                const col = parseInt(event.target.dataset.col);
+                handleClick(event);
+            }
+        }
+
+        function handleLongTouch(row, col) {
+            if (!grid[row][col].revealed) {
+                grid[row][col].flagged = !grid[row][col].flagged;
+                minesLeft += grid[row][col].flagged ? -1 : 1;
+                document.getElementById('mines-count').textContent = minesLeft;
+                updateDisplay();
+            }
+            touchTimer = null;
+        }
+
+        function placeMines() {
+            let minesPlaced = 0;
+            while (minesPlaced < MINES_COUNT) {
+                const row = Math.floor(Math.random() * GRID_SIZE);
+                const col = Math.floor(Math.random() * GRID_SIZE);
+                if (!grid[row][col].mine) {
+                    grid[row][col].mine = true;
+                    minesPlaced++;
+                }
+            }
+        }
+
+        function calculateNumbers() {
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    if (!grid[i][j].mine) {
+                        let count = 0;
+                        for (let di = -1; di <= 1; di++) {
+                            for (let dj = -1; dj <= 1; dj++) {
+                                const ni = i + di;
+                                const nj = j + dj;
+                                if (ni >= 0 && ni < GRID_SIZE && nj >= 0 && nj < GRID_SIZE) {
+                                    if (grid[ni][nj].mine) count++;
+                                }
+                            }
+                        }
+                        grid[i][j].neighborMines = count;
+                    }
+                }
+            }
+        }
+
+        function handleClick(event) {
+            if (gameOver) return;
+            
+            if (!gameStarted) {
+                startTimer();
+                showGameMessage("Нашёл время поиграть? Молодец! 👏");
+            }
+
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+            
+            if (grid[row][col].flagged) return;
+            
+            reveal(row, col);
+            updateDisplay();
+            
+            if (grid[row][col].mine) {
+                gameOver = true;
+                stopTimer();
+                revealAll();
+                showGameMessage("Game Over! Как твой план продаж! 💥");
+                // Отправляем данные в Telegram
+                tg.sendData(JSON.stringify({
+                    action: 'lose',
+                    time: timer
+                }));
+                setTimeout(() => alert('Игра окончена! Примерно как твой план по продажам!'), 500);
+            } else {
+                showGameMessage();
+                
+                if (checkWin()) {
+                    gameOver = true;
+                    stopTimer();
+                    showGameMessage("Победа! А мог бы сделку закрыть! 🎉");
+                    // Отправляем данные в Telegram
+                    tg.sendData(JSON.stringify({
+                        action: 'win',
+                        time: timer,
+                        score: Math.max(1000 - timer * 10, 100)
+                    }));
+                    setTimeout(() => alert(`Победа! Ваше время: ${timer} секунд. А могли бы уже 3 сделки закрыть!`), 500);
+                }
+            }
+        }
+
+        function handleRightClick(event) {
+            event.preventDefault();
+            if (gameOver) return;
+            
+            if (!gameStarted) {
+                startTimer();
+                showGameMessage("Нашёл время поиграть? Молодец! 👏");
+            }
+
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+            
+            if (!grid[row][col].revealed) {
+                grid[row][col].flagged = !grid[row][col].flagged;
+                minesLeft += grid[row][col].flagged ? -1 : 1;
+                document.getElementById('mines-count').textContent = minesLeft;
+                updateDisplay();
+            }
+        }
+
+        function reveal(row, col) {
+            if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return;
+            if (grid[row][col].revealed || grid[row][col].flagged) return;
+            
+            grid[row][col].revealed = true;
+            
+            if (grid[row][col].neighborMines === 0 && !grid[row][col].mine) {
+                for (let di = -1; di <= 1; di++) {
+                    for (let dj = -1; dj <= 1; dj++) {
+                        reveal(row + di, col + dj);
+                    }
+                }
+            }
+        }
+
+        function revealAll() {
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    grid[i][j].revealed = true;
+                }
+            }
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const cells = document.getElementsByClassName('cell');
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    const cell = cells[i * GRID_SIZE + j];
+                    cell.className = 'cell';
+                    
+                    if (grid[i][j].revealed) {
+                        cell.classList.add('revealed');
+                        if (grid[i][j].mine) {
+                            cell.classList.add('mine');
+                            cell.textContent = '💣';
+                        } else if (grid[i][j].neighborMines > 0) {
+                            cell.textContent = grid[i][j].neighborMines;
+                        }
+                    } else if (grid[i][j].flagged) {
+                        cell.classList.add('flagged');
+                        cell.textContent = '🚩';
+                    } else {
+                        cell.textContent = '';
+                    }
+                }
+            }
+        }
+
+        function checkWin() {
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    if (!grid[i][j].mine && !grid[i][j].revealed) return false;
+                }
+            }
+            return true;
+        }
+
+        function initGame() {
+            gameOver = false;
+            gameStarted = false;
+            minesLeft = MINES_COUNT;
+            stopTimer();
+            timer = 0;
+            document.getElementById('timer').textContent = '0';
+            document.getElementById('mines-count').textContent = minesLeft;
+            createGrid();
+            placeMines();
+            calculateNumbers();
+            updateDisplay();
+            showGameMessage("Опять играем вместо работы? Ну давай! 🎮");
+        }
+
+        // Инициализация игры при загрузке
+        initGame();
+        
+        // Сообщаем Telegram, что мини-апп загружен
+        tg.ready();
+    </script>
+</body>
+</html>
