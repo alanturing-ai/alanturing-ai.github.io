@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="utf-8">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Yandex.RTB -->
+<script>window.yaContextCb=window.yaContextCb||[]</script>
+<script src="https://yandex.ru/ads/system/context.js" async></script>
     <style>
         :root {
             --tg-theme-bg-color: #f0f0f0;
@@ -171,29 +174,43 @@
         <span class="emoji">🚗</span>
         Игра в Лизинг
     </div>
-    <div class="game-container">
-        <div class="game-info">
-            <div>Мины: <span id="mines-count">10</span></div>
-            <div>Время: <span id="timer">0</span></div>
-        </div>
-        <div class="grid-container">
-            <div id="gameMessage" class="game-message"></div>
-            <div id="grid" class="grid"></div>
-        </div>
-        <div class="controls">
-            <button onclick="initGame()">Новая игра</button>
-        </div>
     </div>
-<script>
-        // Инициализация Telegram Mini App
-        const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрываем на всю высоту
+   <div class="game-container">
+       <div class="game-info">
+           <div>Мины: <span id="mines-count">10</span></div>
+           <div>Время: <span id="timer">0</span></div>
+       </div>
+       <div class="grid-container">
+           <div id="gameMessage" class="game-message"></div>
+           <div id="grid" class="grid"></div>
+       </div>
+       <div class="controls">
+           <button onclick="initGame()">Новая игра</button>
+       </div>
+   </div>
 
-        // Устанавливаем цвета из темы Telegram
-        document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor || '#f0f0f0');
-        document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor || '#000000');
-        document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor || '#3498db');
-        document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor || '#ffffff');
+   <!-- Yandex.RTB R-A-12518052-1 -->
+   <script>
+       window.yaContextCb.push(() => {
+           Ya.Context.AdvManager.render({
+               "blockId": "R-A-12518052-1",
+               "type": "floorAd",
+               "platform": "touch"
+           })
+       })
+   </script>
+
+   <!-- Основной скрипт приложения -->
+   <script>
+       // Инициализация Telegram Mini App
+       const tg = window.Telegram.WebApp;
+       tg.expand(); // Раскрываем на всю высоту
+
+       // Устанавливаем цвета из темы Telegram
+       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor || '#f0f0f0');
+       document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor || '#000000');
+       document.documentElement.style.setProperty('--tg-theme-button-color', tg.buttonColor || '#3498db');
+       document.documentElement.style.setProperty('--tg-theme-button-text-color', tg.buttonTextColor || '#ffffff');
 
         // Основные переменные игры
         const GRID_SIZE = 10;
